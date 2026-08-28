@@ -183,8 +183,9 @@ textarea.form-input{resize:none;min-height:72px}
 
 /* ── Login ──────────────────────────────────────────────────── */
 #screen-login{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:100vh;padding:24px;
+  position:fixed;inset:0;z-index:300;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  background:var(--bg);padding:24px;overflow-y:auto;
 }
 .login-card{background:var(--card);border-radius:20px;padding:28px 24px;width:100%;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.1)}
 .login-logo{text-align:center;margin-bottom:24px}
@@ -250,45 +251,8 @@ textarea.form-input{resize:none;min-height:72px}
   </div>
   <div id="main">
 
-    <!-- ── LOGIN ─────────────────────────────────────────── -->
-    <div id="screen-login" class="active" style="display:flex">
-      <div class="login-card">
-        <div class="login-logo">
-          <span class="icon">🧺</span>
-          <h1>LaundryFlow</h1>
-          <p>Laundry Shop Management</p>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Role</label>
-          <select id="login-role" class="form-input">
-            <option value="owner">Owner</option>
-            <option value="staff">Staff</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">PIN</label>
-          <div class="pin-dots">
-            <div class="pin-dot" id="pd0"></div>
-            <div class="pin-dot" id="pd1"></div>
-            <div class="pin-dot" id="pd2"></div>
-            <div class="pin-dot" id="pd3"></div>
-          </div>
-          <div class="pin-pad">
-            <button class="pin-key" data-k="1">1</button>
-            <button class="pin-key" data-k="2">2</button>
-            <button class="pin-key" data-k="3">3</button>
-            <button class="pin-key" data-k="4">4</button>
-            <button class="pin-key" data-k="5">5</button>
-            <button class="pin-key" data-k="6">6</button>
-            <button class="pin-key" data-k="7">7</button>
-            <button class="pin-key" data-k="8">8</button>
-            <button class="pin-key" data-k="9">9</button>
-            <button class="pin-key" data-k="0" style="grid-column:2">0</button>
-            <button class="pin-key del" data-k="del">⌫</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- ── LOGIN (동적 렌더링) ────────────────────────────── -->
+    <div id="screen-login"></div>
 
     <!-- ── DASHBOARD ──────────────────────────────────────── -->
     <div id="screen-d" class="screen"></div>
@@ -444,18 +408,29 @@ function go(r,opts={}){
   _route=r;
   _curOid=opts.oid||null;
 
-  // hide all screens
-  document.querySelectorAll('.screen,[id^=screen-login]').forEach(el=>{
-    el.style.display='none';el.classList.remove('active');
-  });
-  document.getElementById('screen-login').style.display='none';
-
-  // show nav & fab
+  const loginEl=document.getElementById('screen-login');
   const navEl=document.getElementById('nav');
   const fabEl=document.getElementById('fab');
-  const isLoggedIn=!!S.session;
-  navEl.classList.toggle('hidden',!isLoggedIn||r==='login');
-  fabEl.classList.toggle('hidden',r!=='o');
+
+  if(r==='login'){
+    // show login overlay, hide everything else
+    loginEl.style.display='flex';
+    navEl.classList.add('hidden');
+    fabEl.classList.add('hidden');
+    document.querySelectorAll('.screen').forEach(el=>{el.style.display='none';el.classList.remove('active');});
+    renderLogin();
+    return;
+  }
+
+  // hide login overlay
+  loginEl.style.display='none';
+
+  // hide all screens
+  document.querySelectorAll('.screen').forEach(el=>{el.style.display='none';el.classList.remove('active');});
+
+  // show nav & fab
+  navEl.classList.remove('hidden');
+  fabEl.classList.toggle('hidden',r!=='o'&&r!=='c');
 
   // update nav active
   ['d','o','c','m'].forEach(t=>{
@@ -470,8 +445,7 @@ function go(r,opts={}){
   else{badge.textContent='Staff 🔒';}
 
   // render screen
-  if(r==='login'){renderLogin();}
-  else if(r==='d'){renderDash();}
+  if(r==='d'){renderDash();}
   else if(r==='o'){renderOrders();}
   else if(r==='on'){renderForm(opts.oid);}
   else if(r==='od'){renderOrderDet(opts.oid);}
@@ -492,8 +466,45 @@ function show(id){
 // ════════════════════════════════════════════════════════════════
 function renderLogin(){
   _pinBuf='';
-  updatePinDots();
-  document.getElementById('screen-login').style.display='flex';
+  // Re-render the login card to ensure fresh DOM
+  const el=document.getElementById('screen-login');
+  el.innerHTML=`
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="icon">🧺</span>
+        <h1>LaundryFlow</h1>
+        <p>Laundry Shop Management</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select id="login-role" class="form-input">
+          <option value="owner">Owner</option>
+          <option value="staff">Staff</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">PIN</label>
+        <div class="pin-dots">
+          <div class="pin-dot" id="pd0"></div>
+          <div class="pin-dot" id="pd1"></div>
+          <div class="pin-dot" id="pd2"></div>
+          <div class="pin-dot" id="pd3"></div>
+        </div>
+        <div class="pin-pad" id="pin-pad">
+          <button class="pin-key" onclick="pinKey('1')">1</button>
+          <button class="pin-key" onclick="pinKey('2')">2</button>
+          <button class="pin-key" onclick="pinKey('3')">3</button>
+          <button class="pin-key" onclick="pinKey('4')">4</button>
+          <button class="pin-key" onclick="pinKey('5')">5</button>
+          <button class="pin-key" onclick="pinKey('6')">6</button>
+          <button class="pin-key" onclick="pinKey('7')">7</button>
+          <button class="pin-key" onclick="pinKey('8')">8</button>
+          <button class="pin-key" onclick="pinKey('9')">9</button>
+          <button class="pin-key" style="grid-column:2" onclick="pinKey('0')">0</button>
+          <button class="pin-key del" onclick="pinKey('del')">⌫</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 function updatePinDots(){
@@ -511,16 +522,15 @@ function pinKey(k){
 }
 
 function tryLogin(){
-  const role=document.getElementById('login-role').value;
+  const role=document.getElementById('login-role')?.value||'owner';
   if(_pinBuf===PINS[role]){
     S.session={role,t:Date.now()};wr();
     go('d');
   }else{
     _pinBuf='';updatePinDots();
-    // shake effect
-    const card=document.querySelector('.login-card');
-    card.style.animation='none';
-    requestAnimationFrame(()=>{card.style.animation='shake .3s ease';});
+    // shake effect on card
+    const card=document.querySelector('#screen-login .login-card');
+    if(card){card.style.animation='none';requestAnimationFrame(()=>{card.style.animation='shake .3s ease';});}
   }
 }
 
@@ -1241,34 +1251,28 @@ function fabAction(){
 // ════════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════════
-// PIN pad bindings
-document.querySelectorAll('.pin-key').forEach(btn=>{
-  btn.addEventListener('click',()=>pinKey(btn.dataset.k));
-});
+// Shake animation (injected once)
+const _shakeStyle=document.createElement('style');
+_shakeStyle.textContent='@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}';
+document.head.appendChild(_shakeStyle);
 
-// shake animation
-const style=document.createElement('style');
-style.textContent='@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}';
-document.head.appendChild(style);
-
-// FAB also for customers
-document.getElementById('nav-c').addEventListener('click',()=>{
-  document.getElementById('fab').classList.toggle('hidden',true);
-  // re-show for customer FAB
-  setTimeout(()=>{
-    if(_route==='c'){
-      document.getElementById('fab').onclick=openNewCust;
-      document.getElementById('fab').classList.remove('hidden');
-    }
-  },50);
-});
-
-// Keyboard support for PIN
+// Keyboard support for PIN (global — works even when login overlay is shown)
 document.addEventListener('keydown',e=>{
-  if(_route==='login'||!S.session){
+  if(_route==='login'){
     if(e.key>='0'&&e.key<='9')pinKey(e.key);
     else if(e.key==='Backspace')pinKey('del');
   }
+});
+
+// FAB wiring — customers tab
+document.getElementById('nav-c').addEventListener('click',()=>{
+  setTimeout(()=>{
+    const fab=document.getElementById('fab');
+    if(_route==='c'){
+      fab.onclick=openNewCust;
+      fab.classList.remove('hidden');
+    }
+  },60);
 });
 
 // Init
