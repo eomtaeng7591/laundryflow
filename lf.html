@@ -551,11 +551,10 @@ function renderDash(){
   const yearStart=new Date(now.getFullYear(),0,1);
 
   function sumOrders(filter){
-    return S.orders.filter(filter).reduce((s,o)=>({
-      rev:s.rev+(o.total||0),
-      cnt:s.cnt+1,
-      cids:s.cids.add(o.cid)
-    },{rev:0,cnt:0,cids:new Set()});
+    const init={rev:0,cnt:0,cids:new Set()};
+    return S.orders.filter(filter).reduce((s,o)=>{
+      s.rev+=(o.total||0);s.cnt++;s.cids.add(o.cid);return s;
+    },init);
   }
 
   const todayData=sumOrders(o=>o.receivedAt.slice(0,10)===td);
