@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>LaundryFlow</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#0a84ff;--green:#34c759;--orange:#ff9500;--red:#ff3b30;--purple:#bf5af2;
+  --bg:#f2f2f7;--card:#ffffff;--border:#e5e5ea;--text:#1c1c1e;--sub:#8e8e93;
+  --nav-h:60px;--header-h:52px;
+  --sat:env(safe-area-inset-top,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;overflow:hidden}
+button{border:none;background:none;cursor:pointer;font:inherit;color:inherit}
+input,select,textarea{font:inherit;color:inherit;border:none;outline:none;background:none}
+a{color:var(--blue);text-decoration:none}
+
+/* ── Layout ────────────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;height:100%;padding-top:calc(var(--header-h) + var(--sat))}
+#header{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  height:calc(var(--header-h) + var(--sat));
+  padding-top:var(--sat);
+  background:var(--blue);
+  display:flex;align-items:center;justify-content:space-between;
+  padding-left:16px;padding-right:16px;
+  box-shadow:0 1px 0 rgba(0,0,0,.1);
+}
+#header-title{color:#fff;font-size:17px;font-weight:700;letter-spacing:-.3px}
+#header-badge{font-size:12px;color:rgba(255,255,255,.85);background:rgba(0,0,0,.2);padding:3px 8px;border-radius:20px}
+#main{flex:1;overflow-y:auto;padding-bottom:calc(var(--nav-h) + var(--sab) + 8px)}
+#nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:100;
+  height:calc(var(--nav-h) + var(--sab));
+  padding-bottom:var(--sab);
+  background:#fff;border-top:1px solid var(--border);
+  display:flex;
+}
+#nav button{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;font-size:10px;font-weight:500;color:var(--sub);padding:6px 0;transition:color .15s;
+}
+#nav button.active{color:var(--blue)}
+#nav button svg{width:22px;height:22px;stroke-width:1.8}
+.screen{display:none;padding:12px 14px}
+.screen.active{display:block}
+
+/* ── Cards & Sections ─────────────────────────────────────── */
+.card{background:var(--card);border-radius:14px;overflow:hidden;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card-pad{padding:14px 16px}
+.section-label{font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 6px}
+.row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.row-title{font-size:15px;font-weight:500}
+.row-sub{font-size:13px;color:var(--sub);margin-top:2px}
+
+/* ── KPI Cards ─────────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.kpi-card{background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.kpi-label{font-size:12px;color:var(--sub);font-weight:500;margin-bottom:4px}
+.kpi-value{font-size:22px;font-weight:700;color:var(--text)}
+.kpi-sub{font-size:12px;color:var(--sub);margin-top:3px}
+
+/* ── Status Chips ──────────────────────────────────────────── */
+.status-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px}
+.status-chip{background:var(--card);border-radius:10px;padding:8px 4px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.status-chip .s-count{font-size:20px;font-weight:700}
+.status-chip .s-label{font-size:10px;color:var(--sub);margin-top:2px}
+.s-received{color:var(--blue)}.s-washing{color:var(--orange)}.s-drying{color:var(--purple)}
+.s-ready{color:var(--green)}.s-completed{color:var(--sub)}
+
+/* ── Bar Chart ─────────────────────────────────────────────── */
+.chart-wrap{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.chart-title{font-size:13px;font-weight:600;color:var(--sub);margin-bottom:10px}
+.chart-bars{display:flex;align-items:flex-end;gap:6px;height:80px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{width:100%;background:var(--blue);border-radius:4px 4px 0 0;min-height:3px;opacity:.85;transition:height .3s}
+.bar-label{font-size:10px;color:var(--sub)}
+
+/* ── Badge / Status ────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-received{background:#e3f0ff;color:var(--blue)}
+.badge-washing{background:#fff3e0;color:var(--orange)}
+.badge-drying{background:#f3e8ff;color:var(--purple)}
+.badge-ready{background:#e6f9ec;color:var(--green)}
+.badge-completed{background:#f2f2f7;color:var(--sub)}
+.badge-delivery{background:#e6f9ec;color:var(--green)}
+.badge-pickup{background:#f2f2f7;color:var(--sub)}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:12px;font-size:15px;font-weight:600;transition:opacity .15s,transform .1s;cursor:pointer}
+.btn:active{opacity:.75;transform:scale(.97)}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn-red{background:var(--red);color:#fff}
+.btn-gray{background:var(--border);color:var(--text)}
+.btn-outline{background:none;border:1.5px solid var(--border);color:var(--text)}
+.btn-full{width:100%}
+.btn-sm{padding:7px 12px;font-size:13px;border-radius:9px}
+
+/* ── FAB ───────────────────────────────────────────────────── */
+.fab{
+  position:fixed;bottom:calc(var(--nav-h) + var(--sab) + 16px);right:18px;z-index:90;
+  width:52px;height:52px;border-radius:50%;background:var(--blue);color:#fff;
+  font-size:26px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(10,132,255,.4);transition:transform .15s,opacity .15s;
+}
+.fab:active{transform:scale(.92)}
+.fab.hidden{display:none}
+
+/* ── Form ──────────────────────────────────────────────────── */
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:block}
+.form-input{
+  width:100%;padding:12px 14px;background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;font-size:15px;transition:border-color .15s;
+}
+.form-input:focus{border-color:var(--blue)}
+.form-input.sm{padding:9px 12px;font-size:14px}
+select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%238e8e93' stroke-width='2'%3E%3Cpath d='M1 4l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+textarea.form-input{resize:none;min-height:72px}
+.counter-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--card);border-radius:12px;margin-bottom:6px}
+.counter-info{font-size:14px;font-weight:500}
+.counter-ctrl{display:flex;align-items:center;gap:10px}
+.counter-btn{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;background:var(--bg);color:var(--text);transition:background .15s}
+.counter-btn:active{background:var(--border)}
+.counter-val{width:28px;text-align:center;font-size:15px;font-weight:700}
+.sum-panel{background:var(--blue);border-radius:14px;padding:16px;color:#fff;margin-bottom:16px}
+.sum-row{display:flex;justify-content:space-between;font-size:13px;opacity:.85;margin-bottom:4px}
+.sum-total{display:flex;justify-content:space-between;font-size:20px;font-weight:700;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.25)}
+.toggle-delivery{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--card);border-radius:12px;cursor:pointer}
+.toggle-delivery input[type=checkbox]{width:20px;height:20px;accent-color:var(--blue);cursor:pointer}
+.toggle-label{font-size:15px;font-weight:500;flex:1}
+
+/* ── Order List Item ───────────────────────────────────────── */
+.order-item{
+  background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:8px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:opacity .15s;
+  display:flex;flex-direction:column;gap:6px;
+}
+.order-item:active{opacity:.75}
+.order-top{display:flex;justify-content:space-between;align-items:flex-start}
+.order-code{font-size:13px;font-weight:700;color:var(--blue)}
+.order-name{font-size:15px;font-weight:600;margin-top:2px}
+.order-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.order-amount{font-size:16px;font-weight:700}
+.order-date{font-size:12px;color:var(--sub)}
+
+/* ── Customer List Item ────────────────────────────────────── */
+.cust-item{
+  background:var(--card);border-radius:14px;padding:13px 16px;margin-bottom:8px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;align-items:center;gap:12px;
+}
+.cust-avatar{width:40px;height:40px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
+.cust-info{flex:1;min-width:0}
+.cust-name{font-size:15px;font-weight:600}
+.cust-sub{font-size:12px;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cust-del{padding:8px;color:var(--red);opacity:.7}
+
+/* ── Price Table ───────────────────────────────────────────── */
+.price-table{width:100%;border-collapse:collapse}
+.price-table th{font-size:11px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:8px 6px;text-align:left;border-bottom:1px solid var(--border)}
+.price-table td{padding:8px 6px;border-bottom:1px solid var(--bg)}
+.price-table input{width:100%;padding:6px 8px;background:var(--bg);border-radius:7px;font-size:13px}
+.price-table .del-btn{color:var(--red);font-size:16px;padding:4px 6px}
+
+/* ── Modal ─────────────────────────────────────────────────── */
+.mo-overlay{
+  position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);backdrop-filter:blur(3px);
+  display:flex;align-items:flex-end;justify-content:center;
+}
+.mo-sheet{
+  background:var(--card);border-radius:20px 20px 0 0;padding:20px 20px calc(20px + var(--sab));
+  width:100%;max-width:480px;animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mo-title{font-size:17px;font-weight:700;margin-bottom:16px}
+.mo-actions{display:flex;gap:10px;margin-top:16px}
+
+/* ── Login ──────────────────────────────────────────────────── */
+#screen-login{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:24px;
+}
+.login-card{background:var(--card);border-radius:20px;padding:28px 24px;width:100%;max-width:360px;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-logo .icon{font-size:48px;display:block;margin-bottom:8px}
+.login-logo h1{font-size:22px;font-weight:800;color:var(--blue)}
+.login-logo p{font-size:13px;color:var(--sub);margin-top:4px}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin:14px 0}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);transition:all .15s}
+.pin-dot.filled{background:var(--blue);border-color:var(--blue)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.pin-key{
+  height:56px;border-radius:14px;font-size:22px;font-weight:500;
+  background:var(--bg);transition:background .1s,transform .1s;
+}
+.pin-key:active{background:var(--border);transform:scale(.94)}
+.pin-key.del{font-size:18px;color:var(--sub)}
+
+/* ── Order Detail ───────────────────────────────────────────── */
+.status-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.status-btn{
+  flex:1;min-width:0;padding:9px 4px;border-radius:10px;font-size:12px;font-weight:600;
+  border:2px solid var(--border);color:var(--sub);background:var(--card);transition:all .15s;
+  white-space:nowrap;
+}
+.status-btn.active-received{border-color:var(--blue);color:var(--blue);background:#e3f0ff}
+.status-btn.active-washing{border-color:var(--orange);color:var(--orange);background:#fff3e0}
+.status-btn.active-drying{border-color:var(--purple);color:var(--purple);background:#f3e8ff}
+.status-btn.active-ready{border-color:var(--green);color:var(--green);background:#e6f9ec}
+.status-btn.active-completed{border-color:var(--sub);color:var(--sub);background:#f2f2f7}
+.detail-section{margin-bottom:14px}
+.detail-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bg)}
+.detail-row:last-child{border-bottom:none}
+.detail-key{font-size:13px;color:var(--sub)}
+.detail-val{font-size:14px;font-weight:500;text-align:right}
+.receipt-total{display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:12px 0;border-top:2px solid var(--border);margin-top:8px}
+
+/* ── Search ─────────────────────────────────────────────────── */
+.search-wrap{position:relative;margin-bottom:12px}
+.search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.4;width:16px;height:16px;stroke-width:2}
+.search-input{width:100%;padding:10px 14px 10px 36px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;font-size:14px}
+.search-input:focus{border-color:var(--blue)}
+
+/* ── Misc ───────────────────────────────────────────────────── */
+.empty-state{text-align:center;padding:48px 24px;color:var(--sub)}
+.empty-state .icon{font-size:40px;display:block;margin-bottom:10px}
+.empty-state p{font-size:14px}
+.divider{height:1px;background:var(--border);margin:12px 0}
+.chip{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600;background:var(--bg);color:var(--sub);margin-right:4px}
+.lock-msg{text-align:center;padding:40px 20px}
+.lock-msg .icon{font-size:44px;display:block;margin-bottom:10px}
+.logout-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin:16px 0;padding:12px;background:var(--card);border-radius:14px;color:var(--red);font-size:15px;font-weight:600;width:100%}
+.back-btn{display:flex;align-items:center;gap:4px;color:var(--blue);font-size:15px;font-weight:600;margin-bottom:16px;padding:2px 0}
+.data-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.check-toggle{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--card);border-radius:12px;margin-bottom:6px;cursor:pointer}
+.check-toggle input{width:48px;height:28px;accent-color:var(--blue)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <span id="header-title">👕 LaundryFlow</span>
+    <span id="header-badge">Login Required</span>
+  </div>
+  <div id="main">
+
+    <!-- ── LOGIN ─────────────────────────────────────────── -->
+    <div id="screen-login" class="active" style="display:flex">
+      <div class="login-card">
+        <div class="login-logo">
+          <span class="icon">🧺</span>
+          <h1>LaundryFlow</h1>
+          <p>Laundry Shop Management</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select id="login-role" class="form-input">
+            <option value="owner">Owner</option>
+            <option value="staff">Staff</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">PIN</label>
+          <div class="pin-dots">
+            <div class="pin-dot" id="pd0"></div>
+            <div class="pin-dot" id="pd1"></div>
+            <div class="pin-dot" id="pd2"></div>
+            <div class="pin-dot" id="pd3"></div>
+          </div>
+          <div class="pin-pad">
+            <button class="pin-key" data-k="1">1</button>
+            <button class="pin-key" data-k="2">2</button>
+            <button class="pin-key" data-k="3">3</button>
+            <button class="pin-key" data-k="4">4</button>
+            <button class="pin-key" data-k="5">5</button>
+            <button class="pin-key" data-k="6">6</button>
+            <button class="pin-key" data-k="7">7</button>
+            <button class="pin-key" data-k="8">8</button>
+            <button class="pin-key" data-k="9">9</button>
+            <button class="pin-key" data-k="0" style="grid-column:2">0</button>
+            <button class="pin-key del" data-k="del">⌫</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD ──────────────────────────────────────── -->
+    <div id="screen-d" class="screen"></div>
+
+    <!-- ── ORDERS ─────────────────────────────────────────── -->
+    <div id="screen-o" class="screen"></div>
+
+    <!-- ── NEW ORDER ──────────────────────────────────────── -->
+    <div id="screen-on" class="screen"></div>
+
+    <!-- ── ORDER DETAIL ───────────────────────────────────── -->
+    <div id="screen-od" class="screen"></div>
+
+    <!-- ── CUSTOMERS ──────────────────────────────────────── -->
+    <div id="screen-c" class="screen"></div>
+
+    <!-- ── PRICES ─────────────────────────────────────────── -->
+    <div id="screen-m" class="screen"></div>
+
+  </div><!-- /main -->
+
+  <!-- NAV -->
+  <nav id="nav" class="hidden">
+    <button id="nav-d" onclick="go('d')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      Dashboard
+    </button>
+    <button id="nav-o" onclick="go('o')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Orders
+    </button>
+    <button id="nav-c" onclick="go('c')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Customers
+    </button>
+    <button id="nav-m" onclick="go('m')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Prices
+    </button>
+  </nav>
+
+  <!-- FAB -->
+  <button class="fab hidden" id="fab" onclick="fabAction()">＋</button>
+
+</div><!-- /app -->
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// DATA & CONSTANTS
+// ════════════════════════════════════════════════════════════════
+const K = 'lf-flow-v1';
+const PINS = {owner:'0000', staff:'1111'};
+const STATUS_LABELS = {received:'Received',washing:'Washing',drying:'Drying',ready:'Ready',completed:'Completed'};
+const STATUS_COLOR  = {received:'blue',washing:'orange',drying:'purple',ready:'green',completed:'gray'};
+const GARMENT_TYPES = [
+  {id:'top',en:'Tops'},{id:'bot',en:'Bottoms'},{id:'und',en:'Underwear'},
+  {id:'tow',en:'Towels'},{id:'etc',en:'Others'}
+];
+
+let S = {}; // global state
+let _pinBuf = '';
+let _curOid = null; // current order detail id
+
+// ── Utilities ─────────────────────────────────────────────────
+function uid(p){return p+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function peso(n){return '₱'+Math.round(n||0).toLocaleString()}
+function fmt(iso){if(!iso)return '-';const d=new Date(iso);return d.toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
+function today(){return new Date().toISOString().slice(0,10)}
+function isOwner(){return S.session&&S.session.role==='owner'}
+
+// ── Persist ───────────────────────────────────────────────────
+function rd(){
+  try{const raw=localStorage.getItem(K);if(raw)S=JSON.parse(raw);}catch(e){}
+  if(!S.orders)S=dflt();
+}
+function wr(){try{localStorage.setItem(K,JSON.stringify(S));}catch(e){console.error('Storage full')}}
+
+function dflt(){
+  return {
+    session:null,
+    shop:{name:'My Laundry Shop',phone:'',address:'Philippines'},
+    fee:50,
+    customers:[],
+    orders:[],
+    prices:{
+      rules:[
+        {id:uid('r'),label:'Small (0–3 kg)',min:0,max:3,price:70},
+        {id:uid('r'),label:'Medium (3–7 kg)',min:3,max:7,price:60},
+        {id:uid('r'),label:'Large (7–15 kg)',min:7,max:15,price:50},
+        {id:uid('r'),label:'X-Large (15+ kg)',min:15,max:999,price:45},
+      ],
+      addons:[
+        {id:uid('a'),name:'Blanket/Quilt (S)',price:200},
+        {id:uid('a'),name:'Blanket/Quilt (L)',price:350},
+        {id:uid('a'),name:'Pillow/Cushion',price:100},
+        {id:uid('a'),name:'Carpet (per m²)',price:150},
+        {id:uid('a'),name:'Curtain (per kg)',price:80},
+      ],
+      types:GARMENT_TYPES.map(g=>({...g}))
+    }
+  };
+}
+
+function seed(){
+  if(S.customers.length>0)return;
+  const cids=[];
+  ['Maria Santos','Jose Ramos','Ana Cruz','Pedro Lopez','Luz Reyes'].forEach(n=>{
+    const id=uid('c');cids.push(id);
+    S.customers.push({id,name:n,phone:'+63 9'+Math.floor(10000000+Math.random()*89999999),address:'Philippines',createdAt:new Date().toISOString()});
+  });
+  const statuses=['received','washing','drying','ready','completed','completed','received','washing'];
+  for(let i=0;i<8;i++){
+    const cid=cids[i%cids.length];
+    const w=(3+Math.random()*10).toFixed(1)*1;
+    const r=S.prices.rules.find(r=>w>=r.min&&w<r.max)||S.prices.rules[S.prices.rules.length-1];
+    const base=w*r.price;
+    const isD=i%3===0;
+    const status=statuses[i];
+    const d=new Date(Date.now()-i*86400000*2);
+    S.orders.push({
+      id:uid('o'),code:'LF'+Date.now().toString().slice(-6),
+      cid,status,weight:w,
+      items:[{id:'top',qty:2},{id:'bot',qty:1}],addons:[],
+      isDelivery:isD,note:'',base,extras:0,fee:isD?S.fee:0,total:base+(isD?S.fee:0),
+      receivedAt:d.toISOString(),
+      ...(status==='completed'?{completedAt:new Date().toISOString()}:{})
+    });
+  }
+  wr();
+}
+
+// ── Calc ──────────────────────────────────────────────────────
+function calcOrder(weight,addons,isDelivery){
+  const w=parseFloat(weight)||0;
+  const rule=S.prices.rules.find(r=>w>=r.min&&w<r.max)||S.prices.rules[S.prices.rules.length-1];
+  const base=rule?w*rule.price:0;
+  const extras=(addons||[]).reduce((s,a)=>{
+    const item=S.prices.addons.find(x=>x.id===a.id);
+    return s+(item?item.price*(a.qty||0):0);
+  },0);
+  const fee=isDelivery?S.fee:0;
+  return {base,extras,fee,total:base+extras+fee};
+}
+
+// ════════════════════════════════════════════════════════════════
+// ROUTING
+// ════════════════════════════════════════════════════════════════
+let _route='login';
+
+function go(r,opts={}){
+  if(!S.session&&r!=='login'){go('login');return;}
+  _route=r;
+  _curOid=opts.oid||null;
+
+  // hide all screens
+  document.querySelectorAll('.screen,[id^=screen-login]').forEach(el=>{
+    el.style.display='none';el.classList.remove('active');
+  });
+  document.getElementById('screen-login').style.display='none';
+
+  // show nav & fab
+  const navEl=document.getElementById('nav');
+  const fabEl=document.getElementById('fab');
+  const isLoggedIn=!!S.session;
+  navEl.classList.toggle('hidden',!isLoggedIn||r==='login');
+  fabEl.classList.toggle('hidden',r!=='o');
+
+  // update nav active
+  ['d','o','c','m'].forEach(t=>{
+    const b=document.getElementById('nav-'+t);
+    if(b)b.classList.toggle('active',(r===t||r==='on'&&t==='o'||r==='od'&&t==='o'));
+  });
+
+  // update header badge
+  const badge=document.getElementById('header-badge');
+  if(!S.session){badge.textContent='Login Required';}
+  else if(S.session.role==='owner'){badge.textContent='Owner 🔓';}
+  else{badge.textContent='Staff 🔒';}
+
+  // render screen
+  if(r==='login'){renderLogin();}
+  else if(r==='d'){renderDash();}
+  else if(r==='o'){renderOrders();}
+  else if(r==='on'){renderForm(opts.oid);}
+  else if(r==='od'){renderOrderDet(opts.oid);}
+  else if(r==='c'){renderCust();}
+  else if(r==='m'){renderPrices();}
+
+  // scroll to top
+  document.getElementById('main').scrollTop=0;
+}
+
+function show(id){
+  const el=document.getElementById(id);
+  if(el){el.style.display='block';el.classList.add('active');}
+}
+
+// ════════════════════════════════════════════════════════════════
+// LOGIN
+// ════════════════════════════════════════════════════════════════
+function renderLogin(){
+  _pinBuf='';
+  updatePinDots();
+  document.getElementById('screen-login').style.display='flex';
+}
+
+function updatePinDots(){
+  for(let i=0;i<4;i++){
+    const d=document.getElementById('pd'+i);
+    if(d)d.classList.toggle('filled',i<_pinBuf.length);
+  }
+}
+
+function pinKey(k){
+  if(k==='del'){_pinBuf=_pinBuf.slice(0,-1);}
+  else if(_pinBuf.length<4){_pinBuf+=k;}
+  updatePinDots();
+  if(_pinBuf.length===4)setTimeout(tryLogin,150);
+}
+
+function tryLogin(){
+  const role=document.getElementById('login-role').value;
+  if(_pinBuf===PINS[role]){
+    S.session={role,t:Date.now()};wr();
+    go('d');
+  }else{
+    _pinBuf='';updatePinDots();
+    // shake effect
+    const card=document.querySelector('.login-card');
+    card.style.animation='none';
+    requestAnimationFrame(()=>{card.style.animation='shake .3s ease';});
+  }
+}
+
+function logout(){
+  if(!confirm('Log out?'))return;
+  S.session=null;wr();go('login');
+}
+
+// ════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════
+function renderDash(){
+  const el=document.getElementById('screen-d');show('screen-d');
+  const td=today();
+  const now=new Date();
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()-6);weekStart.setHours(0,0,0,0);
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+  const yearStart=new Date(now.getFullYear(),0,1);
+
+  function sumOrders(filter){
+    return S.orders.filter(filter).reduce((s,o)=>({
+      rev:s.rev+(o.total||0),
+      cnt:s.cnt+1,
+      cids:s.cids.add(o.cid)
+    },{rev:0,cnt:0,cids:new Set()});
+  }
+
+  const todayData=sumOrders(o=>o.receivedAt.slice(0,10)===td);
+  const weekData =sumOrders(o=>new Date(o.receivedAt)>=weekStart);
+  const monthData=sumOrders(o=>new Date(o.receivedAt)>=monthStart);
+  const yearData =sumOrders(o=>new Date(o.receivedAt)>=yearStart);
+
+  // status counts
+  const statusCnt={};
+  ['received','washing','drying','ready','completed'].forEach(s=>statusCnt[s]=0);
+  S.orders.forEach(o=>{if(statusCnt[o.status]!==undefined)statusCnt[o.status]++;});
+
+  // 7-day chart
+  const days=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date(now);d.setDate(now.getDate()-i);
+    const ds=d.toISOString().slice(0,10);
+    const rev=S.orders.filter(o=>o.receivedAt.slice(0,10)===ds).reduce((s,o)=>s+(o.total||0),0);
+    const label=d.toLocaleDateString('en-US',{weekday:'narrow'});
+    days.push({ds,rev,label});
+  }
+  const maxRev=Math.max(...days.map(d=>d.rev),1);
+
+  el.innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Today</div>
+        <div class="kpi-value">${peso(todayData.rev)}</div>
+        <div class="kpi-sub">${todayData.cnt} orders · ${todayData.cids.size} customers</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">This Week</div>
+        <div class="kpi-value">${peso(weekData.rev)}</div>
+        <div class="kpi-sub">${weekData.cnt} orders</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">This Month</div>
+        <div class="kpi-value">${peso(monthData.rev)}</div>
+        <div class="kpi-sub">${monthData.cnt} orders</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">This Year</div>
+        <div class="kpi-value">${peso(yearData.rev)}</div>
+        <div class="kpi-sub">${yearData.cnt} orders</div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">7-Day Revenue</div>
+      <div class="chart-bars">
+        ${days.map(d=>`
+          <div class="bar-col">
+            <div class="bar" style="height:${Math.max(3,Math.round(d.rev/maxRev*72))}px" title="${peso(d.rev)}"></div>
+            <div class="bar-label">${d.label}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="section-label">Order Status</div>
+    <div class="status-grid">
+      ${['received','washing','drying','ready','completed'].map(s=>`
+        <div class="status-chip">
+          <div class="s-count s-${s}">${statusCnt[s]}</div>
+          <div class="s-label">${STATUS_LABELS[s]}</div>
+        </div>`).join('')}
+    </div>
+
+    <button class="logout-btn" onclick="logout()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      Log Out
+    </button>
+  `;
+}
+
+// ════════════════════════════════════════════════════════════════
+// ORDERS LIST
+// ════════════════════════════════════════════════════════════════
+function renderOrders(){
+  show('screen-o');
+  const sorted=[...S.orders].sort((a,b)=>b.receivedAt.localeCompare(a.receivedAt));
+  const el=document.getElementById('screen-o');
+
+  if(sorted.length===0){
+    el.innerHTML='<div class="empty-state"><span class="icon">📋</span><p>No orders yet.<br>Tap + to add one.</p></div>';
+    return;
+  }
+
+  el.innerHTML=sorted.map(o=>{
+    const cust=S.customers.find(c=>c.id===o.cid);
+    const name=cust?esc(cust.name):'Guest';
+    return `
+    <div class="order-item" onclick="go('od',{oid:'${o.id}'})">
+      <div class="order-top">
+        <div>
+          <div class="order-code">${esc(o.code)}</div>
+          <div class="order-name">${name}</div>
+        </div>
+        <span class="badge badge-${o.status}">${STATUS_LABELS[o.status]}</span>
+      </div>
+      <div class="order-meta">
+        <span class="order-amount">${peso(o.total)}</span>
+        <span class="badge ${o.isDelivery?'badge-delivery':'badge-pickup'}">${o.isDelivery?'Delivery':'Pickup'}</span>
+        <span class="order-date">${fmt(o.receivedAt)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// NEW / EDIT ORDER FORM
+// ════════════════════════════════════════════════════════════════
+let _formData={weight:'',cid:'',newName:'',newPhone:'',newAddr:'',isDelivery:false,note:'',items:{},addons:{}};
+
+function renderForm(oid){
+  show('screen-on');
+  const el=document.getElementById('screen-on');
+  const editing=oid?S.orders.find(o=>o.id===oid):null;
+
+  if(editing){
+    _formData={
+      weight:editing.weight,cid:editing.cid,newName:'',newPhone:'',newAddr:'',
+      isDelivery:editing.isDelivery,note:editing.note||'',
+      items:Object.fromEntries((editing.items||[]).map(i=>[i.id,i.qty])),
+      addons:Object.fromEntries((editing.addons||[]).map(a=>[a.id,a.qty]))
+    };
+  }else{
+    _formData={weight:'',cid:'',newName:'',newPhone:'',newAddr:'',isDelivery:false,note:'',items:{},addons:{}};
+  }
+
+  const custOptions=S.customers.map(c=>`<option value="${c.id}"${_formData.cid===c.id?' selected':''}>${esc(c.name)}</option>`).join('');
+  const isNew=_formData.cid==='' && !editing;
+
+  el.innerHTML=`
+    <button class="back-btn" onclick="go('o')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+      Back
+    </button>
+    <h2 style="font-size:19px;font-weight:700;margin-bottom:16px">${editing?'Edit Order':'New Order'}</h2>
+
+    <div class="form-group">
+      <label class="form-label">Customer</label>
+      <select class="form-input" id="f-cid" onchange="onCustChange(this.value)">
+        <option value="">+ New Customer</option>
+        ${custOptions}
+      </select>
+    </div>
+
+    <div id="new-cust-area" style="${_formData.cid||editing?'display:none':''}">
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input class="form-input" id="f-nc-name" placeholder="Customer name" value="${esc(_formData.newName)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input class="form-input" id="f-nc-phone" placeholder="+63 9XX XXX XXXX" value="${esc(_formData.newPhone)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Address</label>
+        <input class="form-input" id="f-nc-addr" placeholder="Delivery address" value="${esc(_formData.newAddr)}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Weight (kg) *</label>
+      <input class="form-input" id="f-weight" type="number" step="0.1" min="0" placeholder="e.g. 5.5" value="${_formData.weight}" oninput="updateSum()">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Garment Count</label>
+      ${GARMENT_TYPES.map(g=>`
+        <div class="counter-row">
+          <span class="counter-info">${g.en}</span>
+          <div class="counter-ctrl">
+            <button class="counter-btn" onclick="adjItem('${g.id}',-1)">−</button>
+            <span class="counter-val" id="item-${g.id}">${_formData.items[g.id]||0}</span>
+            <button class="counter-btn" onclick="adjItem('${g.id}',1)">+</button>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Special Items</label>
+      ${S.prices.addons.map(a=>`
+        <div class="counter-row">
+          <span class="counter-info">${esc(a.name)} <span style="color:var(--sub);font-size:12px">${peso(a.price)}</span></span>
+          <div class="counter-ctrl">
+            <button class="counter-btn" onclick="adjAddon('${a.id}',-1)">−</button>
+            <span class="counter-val" id="addon-${a.id}">${_formData.addons[a.id]||0}</span>
+            <button class="counter-btn" onclick="adjAddon('${a.id}',1)">+</button>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <div class="form-group">
+      <label class="form-toggle toggle-delivery" onclick="toggleDelivery()">
+        <span class="toggle-label">🛵 Delivery Service</span>
+        <input type="checkbox" id="f-delivery" ${_formData.isDelivery?'checked':''} onclick="event.stopPropagation();toggleDelivery()">
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Note</label>
+      <textarea class="form-input" id="f-note" placeholder="Special instructions...">${esc(_formData.note)}</textarea>
+    </div>
+
+    <div class="sum-panel" id="sum-panel">
+      <div class="sum-row"><span>Base (kg × rate)</span><span id="sum-base">${peso(0)}</span></div>
+      <div class="sum-row"><span>Special items</span><span id="sum-extras">${peso(0)}</span></div>
+      <div class="sum-row"><span>Delivery fee</span><span id="sum-fee">${peso(0)}</span></div>
+      <div class="sum-total"><span>Total</span><span id="sum-total">${peso(0)}</span></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:24px">
+      <button class="btn btn-outline btn-full" onclick="go('o')">Cancel</button>
+      <button class="btn btn-primary btn-full" onclick="saveOrder(${oid?`'${oid}'`:'null'})">Save Order</button>
+    </div>
+  `;
+  updateSum();
+}
+
+function onCustChange(val){
+  _formData.cid=val;
+  const area=document.getElementById('new-cust-area');
+  if(area)area.style.display=val?'none':'';
+}
+
+function adjItem(id,d){
+  _formData.items[id]=Math.max(0,(_formData.items[id]||0)+d);
+  const el=document.getElementById('item-'+id);
+  if(el)el.textContent=_formData.items[id];
+}
+
+function adjAddon(id,d){
+  _formData.addons[id]=Math.max(0,(_formData.addons[id]||0)+d);
+  const el=document.getElementById('addon-'+id);
+  if(el)el.textContent=_formData.addons[id];
+  updateSum();
+}
+
+function toggleDelivery(){
+  const cb=document.getElementById('f-delivery');
+  if(cb){_formData.isDelivery=cb.checked;updateSum();}
+}
+
+function updateSum(){
+  const w=parseFloat(document.getElementById('f-weight')?.value)||0;
+  const isD=document.getElementById('f-delivery')?.checked||false;
+  const addons=Object.entries(_formData.addons).filter(([,q])=>q>0).map(([id,qty])=>({id,qty}));
+  const {base,extras,fee,total}=calcOrder(w,addons,isD);
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('sum-base',peso(base));set('sum-extras',peso(extras));
+  set('sum-fee',peso(fee));set('sum-total',peso(total));
+}
+
+function saveOrder(oid){
+  const w=parseFloat(document.getElementById('f-weight')?.value)||0;
+  if(w<=0){alert('Please enter weight.');return;}
+
+  let cid=document.getElementById('f-cid')?.value||'';
+  if(!cid){
+    const name=(document.getElementById('f-nc-name')?.value||'').trim();
+    if(!name){alert('Customer name is required.');return;}
+    const phone=(document.getElementById('f-nc-phone')?.value||'').trim();
+    const addr=(document.getElementById('f-nc-addr')?.value||'').trim();
+    const newC={id:uid('c'),name,phone,address:addr,createdAt:new Date().toISOString()};
+    S.customers.push(newC);cid=newC.id;
+  }
+
+  const isD=document.getElementById('f-delivery')?.checked||false;
+  const note=(document.getElementById('f-note')?.value||'').trim();
+  const items=Object.entries(_formData.items).filter(([,q])=>q>0).map(([id,qty])=>({id,qty}));
+  const addons=Object.entries(_formData.addons).filter(([,q])=>q>0).map(([id,qty])=>({id,qty}));
+  const {base,extras,fee,total}=calcOrder(w,addons,isD);
+
+  if(oid){
+    const o=S.orders.find(x=>x.id===oid);
+    if(o){
+      Object.assign(o,{cid,weight:w,items,addons,isDelivery:isD,note,base,extras,fee,total});
+      if(o.status==='completed'&&!o.completedAt)o.completedAt=new Date().toISOString();
+    }
+  }else{
+    S.orders.push({
+      id:uid('o'),code:'LF'+Date.now().toString().slice(-6),
+      cid,status:'received',weight:w,items,addons,isDelivery:isD,note,base,extras,fee,total,
+      receivedAt:new Date().toISOString()
+    });
+  }
+  wr();go('o');
+}
+
+// ════════════════════════════════════════════════════════════════
+// ORDER DETAIL
+// ════════════════════════════════════════════════════════════════
+function renderOrderDet(oid){
+  show('screen-od');
+  const el=document.getElementById('screen-od');
+  const o=S.orders.find(x=>x.id===oid);
+  if(!o){el.innerHTML='<p>Order not found.</p>';return;}
+  const cust=S.customers.find(c=>c.id===o.cid);
+
+  const statusBtns=['received','washing','drying','ready','completed'].map(s=>`
+    <button class="status-btn ${o.status===s?'active-'+s:''}" onclick="setStatus('${oid}','${s}')">${STATUS_LABELS[s]}</button>
+  `).join('');
+
+  const items=(o.items||[]).filter(i=>i.qty>0).map(i=>{
+    const g=GARMENT_TYPES.find(x=>x.id===i.id);
+    return g?`<span class="chip">${g.en}: ${i.qty}</span>`:'';
+  }).join('');
+
+  const addons=(o.addons||[]).filter(a=>a.qty>0).map(a=>{
+    const item=S.prices.addons.find(x=>x.id===a.id);
+    return item?`<span class="chip">${esc(item.name)}: ${a.qty}</span>`:'';
+  }).join('');
+
+  el.innerHTML=`
+    <button class="back-btn" onclick="go('o')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+      Orders
+    </button>
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+      <div>
+        <div style="font-size:13px;color:var(--blue);font-weight:700">${esc(o.code)}</div>
+        <h2 style="font-size:19px;font-weight:700">${cust?esc(cust.name):'Guest'}</h2>
+      </div>
+      <span class="badge badge-${o.status}">${STATUS_LABELS[o.status]}</span>
+    </div>
+
+    <div class="section-label">Update Status</div>
+    <div class="status-btns">${statusBtns}</div>
+
+    <div class="card card-pad">
+      <div class="detail-row"><span class="detail-key">Date</span><span class="detail-val">${fmt(o.receivedAt)}</span></div>
+      <div class="detail-row"><span class="detail-key">Weight</span><span class="detail-val">${o.weight} kg</span></div>
+      <div class="detail-row"><span class="detail-key">Service</span><span class="detail-val"><span class="badge ${o.isDelivery?'badge-delivery':'badge-pickup'}">${o.isDelivery?'Delivery':'Pickup'}</span></span></div>
+      ${cust?`<div class="detail-row"><span class="detail-key">Phone</span><span class="detail-val">${esc(cust.phone||'-')}</span></div>`:''}
+      ${cust&&cust.address?`<div class="detail-row"><span class="detail-key">Address</span><span class="detail-val" style="max-width:60%;text-align:right">${esc(cust.address)}</span></div>`:''}
+      ${o.note?`<div class="detail-row"><span class="detail-key">Note</span><span class="detail-val" style="max-width:60%;text-align:right">${esc(o.note)}</span></div>`:''}
+    </div>
+
+    ${items||addons?`
+    <div class="card card-pad">
+      ${items?`<div style="margin-bottom:8px"><div class="detail-key" style="margin-bottom:6px">Garments</div><div>${items}</div></div>`:''}
+      ${addons?`<div><div class="detail-key" style="margin-bottom:6px">Special Items</div><div>${addons}</div></div>`:''}
+    </div>`:''}
+
+    <div class="card card-pad">
+      <div class="detail-row"><span class="detail-key">Base (${o.weight}kg)</span><span class="detail-val">${peso(o.base)}</span></div>
+      ${o.extras?`<div class="detail-row"><span class="detail-key">Special items</span><span class="detail-val">${peso(o.extras)}</span></div>`:''}
+      ${o.fee?`<div class="detail-row"><span class="detail-key">Delivery fee</span><span class="detail-val">${peso(o.fee)}</span></div>`:''}
+      <div class="receipt-total"><span>Total</span><span>${peso(o.total)}</span></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:8px">
+      <button class="btn btn-outline btn-full" onclick="printReceipt('${oid}')">🖨️ Receipt</button>
+      <button class="btn btn-outline btn-full" onclick="go('on',{oid:'${oid}'})">✏️ Edit</button>
+    </div>
+    ${isOwner()?`<button class="btn btn-red btn-full" onclick="deleteOrder('${oid}')">🗑️ Delete Order</button>`:''}
+  `;
+}
+
+function setStatus(oid,status){
+  const o=S.orders.find(x=>x.id===oid);
+  if(!o)return;
+  o.status=status;
+  if(status==='completed'&&!o.completedAt)o.completedAt=new Date().toISOString();
+  wr();renderOrderDet(oid);
+}
+
+function deleteOrder(oid){
+  if(!isOwner()){alert('🔒 Only owner can delete orders.');return;}
+  if(!confirm('Delete this order? This cannot be undone.'))return;
+  S.orders=S.orders.filter(o=>o.id!==oid);wr();go('o');
+}
+
+// ════════════════════════════════════════════════════════════════
+// RECEIPT
+// ════════════════════════════════════════════════════════════════
+function printReceipt(oid){
+  const o=S.orders.find(x=>x.id===oid);
+  if(!o){alert('Order not found.');return;}
+  const cust=S.customers.find(c=>c.id===o.cid);
+  const win=window.open('','_blank','width=400,height=600');
+  if(!win){alert('Please allow popups to print receipts.');return;}
+  const items=(o.items||[]).filter(i=>i.qty>0).map(i=>{
+    const g=GARMENT_TYPES.find(x=>x.id===i.id);
+    return g?`<tr><td>${g.en}</td><td style="text-align:right">${i.qty} pcs</td></tr>`:'';
+  }).join('');
+  const addons=(o.addons||[]).filter(a=>a.qty>0).map(a=>{
+    const item=S.prices.addons.find(x=>x.id===a.id);
+    return item?`<tr><td>${item.name} ×${a.qty}</td><td style="text-align:right">${peso(item.price*a.qty)}</td></tr>`:'';
+  }).join('');
+
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Receipt ${o.code}</title>
+  <style>
+    body{font-family:monospace;font-size:13px;padding:16px;max-width:320px;margin:0 auto}
+    h2{text-align:center;font-size:16px;margin-bottom:2px}
+    .sub{text-align:center;font-size:12px;color:#666;margin-bottom:12px}
+    hr{border:none;border-top:1px dashed #aaa;margin:10px 0}
+    table{width:100%;border-collapse:collapse}
+    td{padding:3px 0}
+    .total{font-size:16px;font-weight:bold}
+    .footer{text-align:center;font-size:11px;color:#999;margin-top:12px}
+    @media print{body{padding:0}}
+  </style></head><body>
+  <h2>${esc(S.shop.name)}</h2>
+  <div class="sub">${esc(S.shop.address)}<br>${esc(S.shop.phone)}</div>
+  <hr>
+  <table>
+    <tr><td>Order</td><td style="text-align:right"><b>${esc(o.code)}</b></td></tr>
+    <tr><td>Date</td><td style="text-align:right">${fmt(o.receivedAt)}</td></tr>
+    <tr><td>Customer</td><td style="text-align:right">${cust?esc(cust.name):'Guest'}</td></tr>
+    <tr><td>Service</td><td style="text-align:right">${o.isDelivery?'Delivery':'Pickup'}</td></tr>
+  </table>
+  <hr>
+  <table>
+    <tr><td>Weight (${o.weight} kg)</td><td style="text-align:right">${peso(o.base)}</td></tr>
+    ${items}${addons}
+    ${o.fee?`<tr><td>Delivery fee</td><td style="text-align:right">${peso(o.fee)}</td></tr>`:''}
+  </table>
+  <hr>
+  <table><tr><td class="total">TOTAL</td><td style="text-align:right" class="total">${peso(o.total)}</td></tr></table>
+  <div class="footer">Thank you! Please come again 🧺</div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),300);
+}
+
+// ════════════════════════════════════════════════════════════════
+// CUSTOMERS
+// ════════════════════════════════════════════════════════════════
+function renderCust(){
+  show('screen-c');
+  const el=document.getElementById('screen-c');
+  const sorted=[...S.customers].sort((a,b)=>a.name.localeCompare(b.name));
+
+  el.innerHTML=`
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg>
+      <input class="search-input" id="cust-search" placeholder="Search by name or phone..." oninput="filterCust(this.value)">
+    </div>
+    <div id="cust-list">
+      ${sorted.length===0?'<div class="empty-state"><span class="icon">👥</span><p>No customers yet.</p></div>':''}
+      ${sorted.map(c=>{
+        const orders=S.orders.filter(o=>o.cid===c.id).length;
+        return `
+        <div class="cust-item" data-name="${esc(c.name).toLowerCase()}" data-phone="${(c.phone||'').toLowerCase()}">
+          <div class="cust-avatar">${esc(c.name[0]||'?').toUpperCase()}</div>
+          <div class="cust-info">
+            <div class="cust-name">${esc(c.name)}</div>
+            <div class="cust-sub">${c.phone?esc(c.phone)+' · ':''}${orders} order${orders!==1?'s':''}</div>
+          </div>
+          ${isOwner()?`<button class="cust-del" onclick="deleteCust('${c.id}',event)">🗑️</button>`:''}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function filterCust(q){
+  const lq=q.toLowerCase();
+  document.querySelectorAll('#cust-list .cust-item').forEach(el=>{
+    const n=el.dataset.name||'';const p=el.dataset.phone||'';
+    el.style.display=(n.includes(lq)||p.includes(lq))?'':'none';
+  });
+}
+
+function deleteCust(id,e){
+  e.stopPropagation();
+  if(!isOwner()){alert('🔒 Only owner can delete customers.');return;}
+  if(!confirm('Delete this customer?'))return;
+  S.customers=S.customers.filter(c=>c.id!==id);wr();renderCust();
+}
+
+function openNewCust(){
+  const html=`
+    <div class="mo-overlay" id="mo-cust" onclick="if(event.target===this)closeMo('mo-cust')">
+      <div class="mo-sheet">
+        <div class="mo-title">New Customer</div>
+        <div class="form-group">
+          <label class="form-label">Name *</label>
+          <input class="form-input" id="mo-name" placeholder="Full name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input class="form-input" id="mo-phone" placeholder="+63 9XX XXX XXXX">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <input class="form-input" id="mo-addr" placeholder="Address">
+        </div>
+        <div class="mo-actions">
+          <button class="btn btn-outline btn-full" onclick="closeMo('mo-cust')">Cancel</button>
+          <button class="btn btn-primary btn-full" onclick="saveCust()">Save</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+  setTimeout(()=>document.getElementById('mo-name')?.focus(),100);
+}
+
+function saveCust(){
+  const name=(document.getElementById('mo-name')?.value||'').trim();
+  if(!name){alert('Name is required.');return;}
+  const phone=(document.getElementById('mo-phone')?.value||'').trim();
+  const address=(document.getElementById('mo-addr')?.value||'').trim();
+  S.customers.push({id:uid('c'),name,phone,address,createdAt:new Date().toISOString()});
+  wr();closeMo('mo-cust');renderCust();
+}
+
+function closeMo(id){document.getElementById(id)?.remove();}
+
+// ════════════════════════════════════════════════════════════════
+// PRICES
+// ════════════════════════════════════════════════════════════════
+function renderPrices(){
+  show('screen-m');
+  const el=document.getElementById('screen-m');
+
+  if(!isOwner()){
+    el.innerHTML=`
+      <div class="lock-msg">
+        <span class="icon">🔒</span>
+        <p style="font-size:17px;font-weight:600">Owner Mode Required</p>
+        <p style="color:var(--sub);margin-top:8px;font-size:14px">Price settings can only be edited by the owner.</p>
+      </div>
+      <table class="price-table">
+        <thead><tr><th>Label</th><th>Min</th><th>Max</th><th>₱/kg</th></tr></thead>
+        <tbody>${S.prices.rules.map(r=>`
+          <tr>
+            <td>${esc(r.label)}</td>
+            <td>${r.min}</td>
+            <td>${r.max>=999?'∞':r.max}</td>
+            <td>${peso(r.price)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    return;
+  }
+
+  el.innerHTML=`
+    <div class="section-label">Weight Rate Rules</div>
+    <div class="card card-pad" style="overflow-x:auto">
+      <table class="price-table" id="rules-table">
+        <thead><tr><th>Label</th><th>Min</th><th>Max</th><th>₱/kg</th><th></th></tr></thead>
+        <tbody id="rules-body">
+          ${S.prices.rules.map((r,i)=>`
+          <tr data-idx="${i}">
+            <td><input value="${esc(r.label)}" onchange="updRule(${i},'label',this.value)"></td>
+            <td><input type="number" value="${r.min}" style="width:55px" onchange="updRule(${i},'min',this.value)"></td>
+            <td><input type="number" value="${r.max>=999?'':r.max}" placeholder="∞" style="width:55px" onchange="updRule(${i},'max',this.value)"></td>
+            <td><input type="number" value="${r.price}" style="width:60px" onchange="updRule(${i},'price',this.value)"></td>
+            <td><button class="del-btn" onclick="delRule(${i})">×</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%" onclick="addRule()">+ Add Rule</button>
+    </div>
+
+    <div class="section-label">Special Items</div>
+    <div class="card card-pad" style="overflow-x:auto">
+      <table class="price-table">
+        <thead><tr><th>Item</th><th>Price (₱)</th><th></th></tr></thead>
+        <tbody id="addons-body">
+          ${S.prices.addons.map((a,i)=>`
+          <tr>
+            <td><input value="${esc(a.name)}" onchange="updAddon(${i},'name',this.value)"></td>
+            <td><input type="number" value="${a.price}" style="width:80px" onchange="updAddon(${i},'price',this.value)"></td>
+            <td><button class="del-btn" onclick="delAddon(${i})">×</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%" onclick="addAddon()">+ Add Item</button>
+    </div>
+
+    <div class="section-label">Delivery Fee</div>
+    <div class="card card-pad">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Fee (₱)</label>
+        <input class="form-input" id="f-fee" type="number" value="${S.fee}">
+      </div>
+    </div>
+
+    <div class="section-label">Shop Info</div>
+    <div class="card card-pad">
+      <div class="form-group">
+        <label class="form-label">Shop Name</label>
+        <input class="form-input" id="sh-name" value="${esc(S.shop.name)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input class="form-input" id="sh-phone" value="${esc(S.shop.phone||'')}">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Address</label>
+        <input class="form-input" id="sh-addr" value="${esc(S.shop.address||'')}">
+      </div>
+    </div>
+
+    <button class="btn btn-green btn-full" style="margin:16px 0" onclick="savePrices()">💾 Save All Settings</button>
+
+    <div class="section-label">Data Management</div>
+    <div class="data-btns">
+      <button class="btn btn-outline" onclick="exportData()">📥 Export JSON</button>
+      <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">📤 Import JSON</button>
+      <button class="btn btn-outline" onclick="loadSample()">🎲 Sample Data</button>
+      <button class="btn btn-red" style="background:var(--red);color:#fff" onclick="resetData()">🗑️ Reset All</button>
+    </div>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+
+    <button class="logout-btn" onclick="logout()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      Log Out
+    </button>
+  `;
+}
+
+function updRule(i,k,v){
+  if(!S.prices.rules[i])return;
+  if(k==='min'||k==='price')S.prices.rules[i][k]=parseFloat(v)||0;
+  else if(k==='max')S.prices.rules[i][k]=v===''||parseFloat(v)===0?999:parseFloat(v)||999;
+  else S.prices.rules[i][k]=v;
+}
+function delRule(i){
+  if(S.prices.rules.length<=1){alert('At least one rule required.');return;}
+  S.prices.rules.splice(i,1);renderPrices();
+}
+function addRule(){
+  S.prices.rules.push({id:uid('r'),label:'New Rule',min:0,max:5,price:50});
+  renderPrices();setTimeout(()=>{const t=document.getElementById('rules-body');if(t)t.lastElementChild?.querySelector('input')?.focus();},50);
+}
+function updAddon(i,k,v){
+  if(!S.prices.addons[i])return;
+  if(k==='price')S.prices.addons[i][k]=parseFloat(v)||0;
+  else S.prices.addons[i][k]=v;
+}
+function delAddon(i){S.prices.addons.splice(i,1);renderPrices();}
+function addAddon(){
+  S.prices.addons.push({id:uid('a'),name:'New Item',price:100});
+  renderPrices();setTimeout(()=>{const b=document.getElementById('addons-body');if(b)b.lastElementChild?.querySelector('input')?.focus();},50);
+}
+
+function savePrices(){
+  S.fee=parseFloat(document.getElementById('f-fee')?.value)||0;
+  S.shop.name=document.getElementById('sh-name')?.value||S.shop.name;
+  S.shop.phone=document.getElementById('sh-phone')?.value||'';
+  S.shop.address=document.getElementById('sh-addr')?.value||'';
+  wr();alert('✅ Settings saved!');
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='laundryflow_'+today()+'.json';
+  a.click();URL.revokeObjectURL(a.href);
+}
+
+function importData(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.customers)throw new Error('Invalid file format.');
+      if(!confirm('This will replace all current data. Continue?')){input.value='';return;}
+      const sess=S.session;S=data;S.session=sess;wr();renderPrices();alert('✅ Data imported!');
+    }catch(err){alert('Import failed: '+err.message);}
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function loadSample(){
+  seed();renderPrices();
+  if(S.customers.length>0)alert('✅ Sample data loaded!');
+}
+
+function resetData(){
+  if(!confirm('⚠️ Reset ALL data? This cannot be undone.'))return;
+  const sess=S.session;S=dflt();S.session=sess;wr();renderPrices();alert('Data reset.');
+}
+
+// ════════════════════════════════════════════════════════════════
+// FAB ACTION
+// ════════════════════════════════════════════════════════════════
+function fabAction(){
+  if(_route==='o')go('on');
+  else if(_route==='c')openNewCust();
+}
+
+// ════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════
+// PIN pad bindings
+document.querySelectorAll('.pin-key').forEach(btn=>{
+  btn.addEventListener('click',()=>pinKey(btn.dataset.k));
+});
+
+// shake animation
+const style=document.createElement('style');
+style.textContent='@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}';
+document.head.appendChild(style);
+
+// FAB also for customers
+document.getElementById('nav-c').addEventListener('click',()=>{
+  document.getElementById('fab').classList.toggle('hidden',true);
+  // re-show for customer FAB
+  setTimeout(()=>{
+    if(_route==='c'){
+      document.getElementById('fab').onclick=openNewCust;
+      document.getElementById('fab').classList.remove('hidden');
+    }
+  },50);
+});
+
+// Keyboard support for PIN
+document.addEventListener('keydown',e=>{
+  if(_route==='login'||!S.session){
+    if(e.key>='0'&&e.key<='9')pinKey(e.key);
+    else if(e.key==='Backspace')pinKey('del');
+  }
+});
+
+// Init
+rd();
+if(S.session&&S.session.role){
+  go('d');
+}else{
+  go('login');
+}
+</script>
+</body>
+</html>
